@@ -1,7 +1,14 @@
 import './App.css'
 import {useState, useEffect} from "react";
 
-// 1. Описуємо інтерфейс для об'єкта тваринки
+// 1. Описуємо інтерфейс для одного завдання
+interface Todo {
+    id: number;
+    text: string;
+    completed: boolean;
+}
+
+// 2. Описуємо інтерфейс для об'єкта тваринки
 interface Animal {
     id: number;
     name: string;
@@ -9,10 +16,11 @@ interface Animal {
     age: string;
     description: string;
     image: string;
+    todos: Todo[]; // <-- Додано масив завдань
 }
 
-//Початковий список тваринок у притулку
-const defaultAnimals = [
+//Початковий список тваринок у притулку iз базовими справами
+const defaultAnimals: Animal[] = [
     {
         id: 1,
         name: 'Бім',
@@ -20,6 +28,10 @@ const defaultAnimals = [
         age: '3 роки',
         description: 'Дружній та активний, любить прогулянки.',
         image: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRlu5vPZJKtQ7w7eJ_lwFczpg5dvH2AAAfHIKVvPoK2Ol0f6AiHI0S6xhU&s=10',
+        todos: [
+            { id: 101, text: 'Ранкова прогулянка', completed: true },
+            { id: 102, text: 'Нагодувати сухим кормом', completed: false },
+        ],
     },
     {
         id: 2,
@@ -28,6 +40,11 @@ const defaultAnimals = [
         age: '2 роки',
         description: 'Спокійна, лагідна та дуже любить увагу.',
         image: 'https://club4paws.ua/images/news/original/12c4806c98b56f304704dfae0266c0ac.webp',
+        todos: [
+            { id: 201, text: 'Почесати за вушком', completed: true },
+            { id: 202, text: 'Дати вітаміни', completed: false },
+        ],
+
     },
     {
         id: 3,
@@ -36,11 +53,14 @@ const defaultAnimals = [
         age: '5 років',
         description: 'Вірний охоронець, добре ладнає з людьми.',
         image: 'https://focus.ua/static/storage/thumbs/740x/b/f1/vw455w-15d880449fcfb910b5d400f958768f1b.jpg',
+        todos: [
+            { id: 301, text: 'Вечірнє тренування', completed: false },
+        ],
     },
 ]
 
 function App() {
-    // 2. Вказуємо TypeScript, що у стані зберігається масив об'єктів Animal
+    // Завантаження бази з LocalStorage
     const [animals, setAnimals] = useState<Animal[]>(() => {
         const savedAnimals = localStorage.getItem('shelter_animals');
         return savedAnimals ? JSON.parse(savedAnimals) : defaultAnimals;
@@ -53,12 +73,15 @@ function App() {
     const [description, setDescription] = useState<string>('');
     const [uploadedImage, setUploadedImage] = useState<string>('');//тут буде зберігатися фотограія у форматі Base64
 
-    // Автоматично зберігаємо масив тварин у localStorage при кожній його зміні
+    // Стан для інпутів створення завдань (ключ — id тваринки, значення — текст справи)
+    const [newTodoTexts, setNewTodoTexts] = useState<Record<number, string>>({});
+
+    // Автоматичне збереження всього стану (разом із задачами) в LocalStorage
     useEffect(() => {
         localStorage.setItem('shelter_animals', JSON.stringify(animals));
     }, [animals]);
 
-    // Функція обробки завантаження файлу з ПК
+        // Функція обробки завантаження файлу з ПК
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -94,6 +117,8 @@ function App() {
             age: age,
             description: description,
             image: uploadedImage ? uploadedImage : defaultImage,
+            todos: [], // Нова тваринка реєструється з порожнім списком справ
+
         };
 
         setAnimals([...animals, newAnimal]);
@@ -114,6 +139,50 @@ function App() {
     const handleRemoveAnimal = (id: number) => {
         setAnimals(animals.filter((animal) => animal.id !== id));
     };
+    // --- Функції для Todo List всередині карток ---
+// Перемикання чекбоксу справи (виконано / не виконано)
+    const handleToggleTodo = (animalId: number, todoId: number) => {
+        setAnimals(
+            animals.map((animal) => {
+                if (animal.id === animalId) {
+                    return {
+                        ...animal,
+                        todos: (animal.todos || []).map((todo) =>
+                            todo.id === todoId ? { ...todo, completed: !todo.completed } : todo
+                        ),
+                    };
+                }
+                return animal;
+            })
+        );
+    };
+// Додавання нової справи до конкретної тваринки
+    const handleAddTodo = (animalId: number) => {
+        const todoText = newTodoTexts[animalId]?.trim();
+        if (!todoText) return;
+
+        const newTodo: Todo = {
+            id: Date.now(),
+            text: todoText,
+            completed: false,
+        };
+
+        setAnimals(
+            animals.map((animal) => {
+                if (animal.id === animalId) {
+                    return {
+                        ...animal,
+                        todos: [...(animal.todos || []), newTodo],
+                    };
+                }
+                return animal;
+            })
+        );
+
+        // Очищаємо інпут конкретної тваринки
+        setNewTodoTexts({ ...newTodoTexts, [animalId]: '' });
+    };
+
 
     return (
         <main className="min-h-screen bg-gray-100 px-6 py-10">
@@ -122,13 +191,13 @@ function App() {
                     Панель керування притулком
                 </h1>
                 <p className="text-center text-gray-600 mb-10">
-                    Керуйте каталогом притулку та додавайте фотографії нових тварин.
+                    Додавайте вихованців, завантажуйте фото та плануйте завдання по догляду. Усе зберігається автоматично!
                 </p>
 
                 {/* Форма додавання */}
                 <section className="bg-white rounded-2xl p-6 shadow-md mb-12 max-w-xl mx-auto">
                     <h2 className="text-xl font-semibold text-gray-950 mb-4">
-                        Прийняти нову тваринку до притулку
+                        Приняти нову тваринку до притулку
                     </h2>
                     <form onSubmit={handleAddAnimal} className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -140,7 +209,7 @@ function App() {
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    placeholder="<Сірко>"
+                                    placeholder="Сірко"
                                     className="w-full text-sm px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 />
                             </div>
@@ -186,7 +255,7 @@ function App() {
                             </div>
                         </div>
 
-                        {/* Прев'ю */}
+                        {/* Прев'ю файлу */}
                         {uploadedImage && (
                             <div className="mt-2 flex items-center gap-4 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
                                 <img
@@ -220,7 +289,6 @@ function App() {
                     </form>
                 </section>
 
-
                 {/* Відображення карток тварин */}
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">
                     Тваринки в притулку ({animals.length})
@@ -235,48 +303,98 @@ function App() {
                         {animals.map((animal) => (
                             <article
                                 key={animal.id}
-                                className="rounded-2xl bg-white shadow-md transition hover:-translate-y-1 hover:shadow-lg flex flex-col overflow-hidden"
+                                className="rounded-2xl bg-white shadow-md transition hover:shadow-lg flex flex-col overflow-hidden justify-between"
                             >
-                                <div className="h-48 w-full bg-gray-200 overflow-hidden relative">
-                                    <img
-                                        src={animal.image}
-                                        alt={animal.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                    <span className="absolute top-3 left-3 rounded-full bg-emerald-100/90 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-emerald-800 shadow-sm">
-                    {animal.type}
-                  </span>
-                                </div>
-
-                                <div className="p-6 flex flex-col flex-grow justify-between">
-                                    <div>
-                                        <div className="flex justify-between items-baseline mb-2">
-                                            <h3 className="text-2xl font-semibold text-gray-900">
-                                                {animal.name}
-                                            </h3>
-                                            <p className="text-xs font-medium text-gray-500">
-                                                {animal.age}
-                                            </p>
-                                        </div>
-                                        <p className="text-sm text-gray-600 mb-6 line-clamp-3">
-                                            {animal.description}
-                                        </p>
+                                <div>
+                                    {/* Зображення тваринки */}
+                                    <div className="h-52 w-full bg-gray-200 overflow-hidden relative">
+                                        <img
+                                            src={animal.image}
+                                            alt={animal.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <span className="absolute top-3 left-3 rounded-full bg-emerald-100/90 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-emerald-800 shadow-sm">
+                                        {animal.type}
+                                    </span>
                                     </div>
 
-                                    <button
-                                        onClick={() => handleRemoveAnimal(animal.id)}
-                                        className="w-full border border-rose-200 hover:border-transparent hover:bg-rose-500 text-rose-600 hover:text-white font-medium text-sm py-2 rounded-xl transition mt-auto shadow-sm"
-                                    >
-                                        Знайшов дім! 🏠
-                                    </button>
+                                    {/* Основний текстовий вміст та Todo List */}
+                                    <div className="p-5">
+                                        <div className="flex justify-between items-baseline mb-1">
+                                            <h3 className="text-xl font-bold text-gray-900">{animal.name}</h3>
+                                            <p className="text-xs font-medium text-gray-500">{animal.age}</p>
+                                        </div>
+
+                                        <p className="text-xs text-gray-600 mb-4 line-clamp-2">{animal.description}</p>
+
+                                        <div className="border-t border-gray-100 pt-3">
+                                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                                                Список справ:
+                                            </h4>
+
+                                            {/* Безпечне виведення завдань через захисні умови */}
+                                            {(!animal.todos || animal.todos.length === 0) ? (
+                                                <p className="text-xs text-gray-400 italic mb-3">Завдань немає</p>
+                                            ) : (
+                                                <ul className="space-y-1.5 mb-3 max-h-32 overflow-y-auto pr-1">
+                                                    {animal.todos.map((todo) => (
+                                                        <li
+                                                            key={todo.id}
+                                                            onClick={() => handleToggleTodo(animal.id, todo.id)}
+                                                            className={`flex items-center gap-2 cursor-pointer text-xs p-1.5 rounded-lg transition hover:bg-gray-50 ${
+                                                                todo.completed ? 'line-through text-gray-400' : 'text-gray-700'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={todo.completed}
+                                                                onChange={() => {}}
+                                                                className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+
+                                                            />
+                                                            <span className="break-all">{todo.text}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+
+                                            {/* Форма додавання справи всередині картки */}
+                                            <div className="flex gap-1.5 mb-4">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Що зробити..."
+                                                    value={newTodoTexts[animal.id] || ''}
+                                                    onChange={(e) => setNewTodoTexts({ ...newTodoTexts, [animal.id]: e.target.value })}
+                                                    className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleAddTodo(animal.id)}
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
+
+                                    {/* Кнопка видалення тваринки */}
+                                    <div className="px-5 pb-5 mt-auto">
+                                        <button
+                                            onClick={() => handleRemoveAnimal(animal.id)}
+                                            className="w-full border border-rose-200 hover:border-transparent hover:bg-rose-500 text-rose-600 hover:text-white font-medium text-xs py-2 rounded-xl transition shadow-sm"
+                                        >
+                                            Знайшов дім! 🏠
+                                        </button>
+                                    </div>
                             </article>
-                        ))}
+                            ))}
                     </div>
                 )}
             </section>
         </main>
-    );
+);
 }
 
 export default App;
